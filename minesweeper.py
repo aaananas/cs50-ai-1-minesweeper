@@ -1,4 +1,5 @@
 import random
+import math
 
 X = [0, 0, -1, -1, -1, 1, 1, 1]
 Y = [-1, 1, -1, 0, 1, -1, 0, 1]
@@ -96,8 +97,6 @@ class Sentence:
     def __init__(self, cells, count):
         self.cells = set(cells)
         self.count = count
-        self.safes = set()
-        self.mines = set()
 
     def __eq__(self, other):
         return self.cells == other.cells and self.count == other.count
@@ -109,29 +108,34 @@ class Sentence:
         """
         Returns the set of all cells in self.cells known to be mines.
         """
-        return self.mines
+        if self.count != 0 and len(self.cells) == self.count:
+            return self.cells
+        else:
+            return set()
 
     def known_safes(self):
         """
         Returns the set of all cells in self.cells known to be safe.
         """
-        return self.safes
+        if self.count == 0:
+            return self.cells
+        else:
+            return set()
 
     def mark_mine(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be a mine.
         """
-        if cell in self.cells:
-            self.mines.add(cell)
+        self.cells.remove(cell)
+        self.count -= 1
 
     def mark_safe(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be safe.
         """
-        if cell in self.cells:
-            self.safes.add(cell)
+        self.cells.remove(cell)
 
 
 class MinesweeperAI:
@@ -162,27 +166,18 @@ class MinesweeperAI:
         """
         self.mines.add(cell)
         for sentence in self.knowledge:
-            sentence.mark_mine(cell)
+            if cell in sentence.cells:
+                sentence.mark_mine(cell)
 
     def mark_safe(self, cell):
         """
         Marks a cell as safe, and updates all knowledge
-        to mark that cell as safe as well.
+        to mark that cell- as safe as well.
         """
         self.safes.add(cell)
         for sentence in self.knowledge:
-            sentence.mark_safe(cell)
-
-    def update_knowledge(self):
-        for sentence in self.knowledge:
-            if len(sentence.mines) == sentence.count:
-                for c in sentence.cells:
-                    if c not in sentence.mines:
-                        self.mark_safe(c)
-            if sentence.count == len(sentence.cells) - len(sentence.safes):
-                for c in sentence.cells:
-                    if c not in sentence.safes:
-                        self.mark_mine(c)
+            if cell in sentence.cells:
+                sentence.mark_safe(cell)
 
     def add_knowledge(self, cell, count):
         """
@@ -200,19 +195,64 @@ class MinesweeperAI:
                if they can be inferred from existing knowledge
         """
         self.moves_made.add(cell)
-        self.safes.add(cell)
+        self.mark_safe(cell)
 
-        sentence = Sentence(self.neighbour_cells(cell), count)
+        neighbours = set()
+        for i in range(len(X)):
+            if self.valid_index(cell, X[i], Y[i]):
+                neighbour = (cell[0] + X[i], cell[1] + Y[i])
 
+                if neighbour in self.moves_made:
+                    continue
+
+                if self.is_known_mine(neighbour):
+                    count -= 1
+                    continue
+
+                if self.is_known_safe(neighbour):
+                    continue
+
+                neighbours.add(neighbour)
+
+        sentence = Sentence(neighbours, count)
         self.knowledge.append(sentence)
         self.update_knowledge()
 
-    def neighbour_cells(self, cell):
-        return {
-            (cell[0] + X[i], cell[1] + Y[i])
-            for i in range(len(X))
-            if 0 <= cell[0] + X[i] < self.height and 0 <= cell[1] + Y[i] < self.width
-        }
+        self.draw_board()
+        print(cell)
+
+    def update_knowledge(self):
+        known_safes = set()
+        known_mines = set()
+
+        for sentence in self.knowledge:
+            for cell in (sentence.known_safes() - self.moves_made):
+                known_safes.add(cell)
+
+            for cell in sentence.known_mines():
+                known_mines.add(cell)
+
+        for cell in known_mines:
+            self.mark_mine(cell)
+        for cell in known_safes:
+            self.mark_safe(cell)
+
+    def is_known_mine(self, cell):
+        for sentence in self.knowledge:
+            if cell in sentence.known_mines():
+                self.mark_mine(cell)
+                return True
+        return False
+
+    def is_known_safe(self, cell):
+        for sentence in self.knowledge:
+            if cell in sentence.known_safes():
+                self.mark_safe(cell)
+                return True
+        return False
+
+    def valid_index(self, cell, x, y):
+        return 0 <= cell[0] + x < self.height and 0 <= cell[1] + y < self.width
 
     def make_safe_move(self):
         """
@@ -223,9 +263,8 @@ class MinesweeperAI:
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        for cell in self.safes:
-            if cell not in self.moves_made:
-                return cell
+        for cell in (self.safes - self.moves_made):
+            return cell
 
     def make_random_move(self):
         """
@@ -234,8 +273,31 @@ class MinesweeperAI:
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        # not so random :)
+        # not so random :) TODO add logic to find less random move
         for i in range(self.height):
             for j in range(self.width):
                 if (i, j) not in self.moves_made and (i, j) not in self.mines:
                     return i, j
+
+    # def mark_mines(self):
+    #     for s in self.knowledge:
+    #         if len(s.cells) == s.count:
+    #             for cell in s.cells:
+    #                 self.mark_mine(cell)
+    #         if s.count == 0:
+    #             for cell in s.cells:
+    #                 self.mark_safe(cell)
+
+    def draw_board(self):
+        board = ""
+        for i in range(8):
+            for j in range(8):
+                if (i, j) in self.safes:
+                    board += "o"
+                elif (i, j) in self.mines:
+                    board += "X"
+                else:
+                    board += "_"
+                board += " "
+            board += "\n"
+        print(board)
