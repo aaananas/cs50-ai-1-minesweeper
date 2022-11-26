@@ -216,12 +216,18 @@ class MinesweeperAI:
 
         sentence = Sentence(neighbours, count)
         self.knowledge.append(sentence)
+
         self.update_knowledge()
 
         self.draw_board()
         print(cell)
 
     def update_knowledge(self):
+        self.knowledge = [
+            sentence
+            for sentence in self.knowledge
+            if len(sentence.cells) != 0
+        ]
         known_safes = set()
         known_mines = set()
 
@@ -263,8 +269,8 @@ class MinesweeperAI:
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        for cell in (self.safes - self.moves_made):
-            return cell
+        available = list(self.safes - self.moves_made)
+        return None if len(available) == 0 else random.choice(available)
 
     def make_random_move(self):
         """
@@ -290,8 +296,8 @@ class MinesweeperAI:
 
     def draw_board(self):
         board = ""
-        for i in range(8):
-            for j in range(8):
+        for i in range(self.height):
+            for j in range(self.width):
                 if (i, j) in self.safes:
                     board += "o"
                 elif (i, j) in self.mines:
@@ -300,4 +306,5 @@ class MinesweeperAI:
                     board += "_"
                 board += " "
             board += "\n"
+
         print(board)
